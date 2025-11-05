@@ -1,0 +1,28 @@
+{
+  "name": "estudia-lambda-mcp-bridge",
+  "version": "3.0.0",
+  "description": "EstudIA Lambda MCP Bridge - Sistema de gestión educativa con embeddings y búsqueda semántica",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.js",
+    "start": "node index.js",
+    "build": "npm install --production && zip -r function.zip . -x '*.git*' 'README.md' 'EXAMPLES.md' '*.DS_Store' '.env' 'test/*'",
+    "deploy": "npm run build && echo 'function.zip creado. Súbelo a AWS Lambda con handler: index.handler y runtime: Node.js 18.x'",
+    "package": "zip -r estudia-lambda.zip index.js mcp_bridge.js package.json node_modules/"
+  },
+  "keywords": ["lambda", "estudia", "mcp", "embeddings", "gemini", "supabase", "education", "ai"],
+  "author": "EstudIA Team",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/estudia/estudia-lambda"
+  }
+}
