@@ -51,7 +51,7 @@ function getEndpoint(event) {
   // Mapeo de endpoints
   if (path.includes('/fiscal-advice') || path.includes('/fiscaladvice')) return 'fiscal-advice';
   if (path.includes('/generate-embedding') || path.includes('/embedding')) return 'generate-embedding';
-  if (path.includes('/store-document-chunk') || path.includes('/store-chunk')) return 'store-document-chunk';
+  if (path.includes('/store-document-chunks') || path.includes('/store-chunks')) return 'store-document-chunks';
   if (path.includes('/search-chunks') || path.includes('/chunks')) return 'search-chunks';
   if (path.includes('/chat-classroom') || path.includes('/chat-classroom')) return 'chat-classroom';
   if (path.includes('/classroom-info') || path.includes('/classroom')) return 'classroom-info';
@@ -103,8 +103,8 @@ exports.handler = async (event, context) => {
         return createResponse(result.statusCode, result.body);
       }
 
-      case 'store-document-chunk': {
-        console.log('[MCP] Llamando store_document_chunk...');
+      case 'store-document-chunks': {
+        console.log('[MCP] Llamando store_document_chunks...');
         const result = await mcpBridge.handleMcpStoreDocumentChunk(params);
         return createResponse(result.statusCode, result.body);
       }
@@ -177,7 +177,7 @@ exports.handler = async (event, context) => {
             generateEmbedding: '/generate-embedding',
             createEmbedding: '/create-embedding',
             // Documentos y Chunks
-            storeDocumentChunk: '/store-document-chunk',
+            storeDocumentChunks: '/store-document-chunks',
             searchChunks: '/search-chunks',
             // Asistentes
             chatClassroom: '/chat-classroom',
@@ -206,9 +206,9 @@ exports.handler = async (event, context) => {
                 classroom_id: 'string (required, UUID del classroom)'
               }
             },
-            storeDocumentChunk: {
+            storeDocumentChunks: {
               method: 'POST',
-              path: '/store-document-chunk',
+              path: '/store-document-chunks',
               body: {
                 classroom_document_id: 'string (required, UUID del documento)',
                 chunk_index: 'number (required, índice del chunk: 0, 1, 2...)',
@@ -301,7 +301,7 @@ exports.handler = async (event, context) => {
               }'
             `.trim(),
             storeChunk: `
-            curl -X POST https://your-api-url.com/store-document-chunk \\
+            curl -X POST https://your-api-url.com/store-document-chunks \\
               -H "Content-Type: application/json" \\
               -d '{
                 "classroom_document_id": "doc-uuid-123",
@@ -343,7 +343,7 @@ exports.handler = async (event, context) => {
             '/health',
             '/generate-embedding',
             '/create-embedding',
-            '/store-document-chunk',
+            '/store-document-chunks',
             '/search-chunks',
             '/chat-classroom',
             '/classroom-info',
