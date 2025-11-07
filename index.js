@@ -59,6 +59,7 @@ function getEndpoint(event) {
   if (path.includes('/professor-assistant') || path.includes('/professor')) return 'professor-assistant';
   if (path.includes('/generate-resources') || path.includes('/resources')) return 'generate-resources';
   if (path.includes('/analyze-user-context') || path.includes('/analyze-context')) return 'analyze-user-context';
+  if (path.includes('/generate-flashcards') || path.includes('/flashcards')) return 'generate-flashcards';
   
   // Health check
   if (path.includes('/health')) return 'health';
@@ -150,6 +151,12 @@ exports.handler = async (event, context) => {
         const result = await mcpBridge.handleMcpAnalyzeUserContext(params);
         return createResponse(result.statusCode, result.body);
       }
+
+      case 'generate-flashcards': {
+        console.log('[MCP] Llamando generate_flashcards...');
+        const result = await mcpBridge.handleMcpGenerateFlashcards(params);
+        return createResponse(result.statusCode, result.body);
+      }
       
       // ========== HEALTH CHECK ==========
       
@@ -185,6 +192,7 @@ exports.handler = async (event, context) => {
             // Classroom
             classroomInfo: '/classroom-info',
             generateResources: '/generate-resources',
+            generateFlashcards: '/generate-flashcards',
             // Contexto de Usuario
             analyzeUserContext: '/analyze-user-context',
             // Legacy (FiscAI)
@@ -209,12 +217,13 @@ exports.handler = async (event, context) => {
             storeDocumentChunks: {
               method: 'POST',
               path: '/store-document-chunks',
+              description: 'Procesa y almacena chunks AUTOMÁTICAMENTE - solo pasa el ID del documento',
               body: {
                 classroom_document_id: 'string (required, UUID del documento)',
-                chunk_index: 'number (required, índice del chunk: 0, 1, 2...)',
-                content: 'string (required, contenido del chunk)',
-                token_count: 'number (optional, número de tokens)'
-              }
+                chunk_size: 'number (optional, tamaño de cada chunk en caracteres, default: 1000)',
+                chunk_overlap: 'number (optional, overlap entre chunks, default: 100)'
+              },
+              note: 'Este endpoint lee el documento, aplica OCR si es imagen, divide en chunks y almacena todo automáticamente'
             },
             searchChunks: {
               method: 'POST',
@@ -262,6 +271,17 @@ exports.handler = async (event, context) => {
                 source_document_ids: 'array (optional, UUIDs de documentos específicos)'
               }
             },
+            generateFlashcards: {
+              method: 'POST',
+              path: '/generate-flashcards',
+              description: 'Genera tarjetas de estudio (flashcards) a partir de documentos del classroom',
+              body: {
+                classroom_id: 'string (required, UUID del classroom)',
+                max_flashcards: 'number (optional, máximo de tarjetas a generar, default: 20, max: 50)',
+                difficulty_level: 'string (optional, "easy", "medium", "hard", "mixed", default: mixed)'
+              },
+              note: 'Las flashcards incluyen preguntas, respuestas, conceptos clave y términos del contenido'
+            },
             analyzeUserContext: {
               method: 'POST',
               path: '/analyze-user-context',
@@ -301,13 +321,21 @@ exports.handler = async (event, context) => {
               }'
             `.trim(),
             storeChunk: `
+            # PROCESAMIENTO AUTOMÁTICO - Solo pasa el ID del documento
             curl -X POST https://your-api-url.com/store-document-chunks \\
               -H "Content-Type: application/json" \\
               -d '{
                 "classroom_document_id": "doc-uuid-123",
-                "chunk_index": 0,
-                "content": "Los embeddings son vectores numéricos..."
+                "chunk_size": 1000,
+                "chunk_overlap": 100
               }'
+            
+            # El servidor automáticamente:
+            # 1. Lee el documento de Storage
+            # 2. Aplica OCR si es imagen
+            # 3. Divide en chunks con overlap
+            # 4. Genera embeddings
+            # 5. Almacena todos los chunks
             `.trim(),
             searchChunks: `
             curl -X POST https://your-api-url.com/search-chunks \\
@@ -324,6 +352,15 @@ exports.handler = async (event, context) => {
               -d '{
                 "user_id": "user-uuid-123",
                 "session_id": "session-uuid-456"
+              }'
+            `.trim(),
+            generateFlashcards: `
+            curl -X POST https://your-api-url.com/generate-flashcards \\
+              -H "Content-Type: application/json" \\
+              -d '{
+                "classroom_id": "550e8400-e29b-41d4-a716-446655440000",
+                "max_flashcards": 20,
+                "difficulty_level": "mixed"
               }'
             `.trim()
           },
@@ -349,6 +386,7 @@ exports.handler = async (event, context) => {
             '/classroom-info',
             '/professor-assistant',
             '/generate-resources',
+            '/generate-flashcards',
             '/analyze-user-context',
             '/fiscal-advice (legacy)',
           ],

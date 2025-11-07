@@ -448,14 +448,20 @@ async function handleMcpSearchSimilarDocuments(params) {
 }
 
 /**
- * Handler para store_document_chunk vía MCP
+ * Handler para store_document_chunks vía MCP (procesamiento automático)
+ * 
+ * Este handler usa el tool store_document_chunks que procesa TODO el documento automáticamente:
+ * - Lee el documento de Storage
+ * - Aplica OCR si es imagen
+ * - Divide en chunks
+ * - Genera embeddings
+ * - Almacena todos los chunks
  */
 async function handleMcpStoreDocumentChunk(params) {
   const { 
     classroom_document_id,
-    chunk_index,
-    content,
-    token_count
+    chunk_size = 1000,
+    chunk_overlap = 100
   } = params;
 
   if (!classroom_document_id || !classroom_document_id.trim()) {
@@ -463,48 +469,25 @@ async function handleMcpStoreDocumentChunk(params) {
       statusCode: 400,
       body: {
         error: 'Falta el parámetro "classroom_document_id"',
-        required: ['classroom_document_id', 'chunk_index', 'content'],
-        optional: ['token_count'],
-        hint: 'El ID del documento es obligatorio'
-      }
-    };
-  }
-
-  if (chunk_index === undefined || chunk_index === null) {
-    return {
-      statusCode: 400,
-      body: {
-        error: 'Falta el parámetro "chunk_index"',
-        required: ['classroom_document_id', 'chunk_index', 'content'],
-        hint: 'El índice del chunk es obligatorio (0, 1, 2, ...)'
-      }
-    };
-  }
-
-  if (!content || !content.trim()) {
-    return {
-      statusCode: 400,
-      body: {
-        error: 'Falta el parámetro "content" o está vacío',
-        required: ['classroom_document_id', 'chunk_index', 'content'],
-        hint: 'El contenido del chunk no puede estar vacío'
+        required: ['classroom_document_id'],
+        optional: ['chunk_size (default: 1000)', 'chunk_overlap (default: 100)'],
+        hint: 'El ID del documento es obligatorio. El documento se procesará automáticamente.'
       }
     };
   }
 
   try {
-    console.log(`[MCP] Almacenando chunk de documento`);
+    console.log(`[MCP] Procesando documento automáticamente`);
     console.log(`[MCP] Document ID: ${classroom_document_id}`);
-    console.log(`[MCP] Chunk Index: ${chunk_index}`);
-    console.log(`[MCP] Content length: ${content.length} caracteres`);
-    console.log(`[MCP] Token count: ${token_count || 'auto'}`);
+    console.log(`[MCP] Chunk size: ${chunk_size}`);
+    console.log(`[MCP] Chunk overlap: ${chunk_overlap}`);
+    console.log(`[MCP] Este proceso puede tomar varios segundos...`);
 
-    // Llamar al tool store_document_chunk del servidor MCP
-    const result = await callMcpTool('store_document_chunk', {
+    // Llamar al tool store_document_chunks que procesa TODO automáticamente
+    const result = await callMcpTool('store_document_chunks', {
       classroom_document_id,
-      chunk_index: parseInt(chunk_index),
-      content,
-      token_count: token_count ? parseInt(token_count) : undefined
+      chunk_size: parseInt(chunk_size),
+      chunk_overlap: parseInt(chunk_overlap)
     });
 
     return {
@@ -516,21 +499,21 @@ async function handleMcpStoreDocumentChunk(params) {
         timestamp: new Date().toISOString(),
         metadata: {
           classroom_document_id,
-          chunk_index: parseInt(chunk_index),
-          content_length: content.length,
-          token_count: token_count || 'auto'
+          chunk_size: parseInt(chunk_size),
+          chunk_overlap: parseInt(chunk_overlap),
+          mode: 'automatic_processing'
         }
       }
     };
   } catch (error) {
-    console.error(`[MCP] Error almacenando chunk:`, error);
+    console.error(`[MCP] Error procesando documento:`, error);
     
     return {
       statusCode: 500,
       body: {
         error: error.message,
         timestamp: new Date().toISOString(),
-        hint: 'Verifica que el documento exista y que Supabase esté configurado correctamente'
+        hint: 'Verifica que el documento exista en classroom_documents y tenga un archivo en Storage'
       }
     };
   }
@@ -1057,6 +1040,98 @@ async function handleMcpAnalyzeUserContext(params) {
 }
 
 /**
+ * Handler para generate_flashcards vía MCP
+ */
+async function handleMcpGenerateFlashcards(params) {
+  const {
+    classroom_id,
+    max_flashcards = 20,
+    difficulty_level = 'mixed'
+  } = params;
+
+  // Validación de parámetros
+  if (!classroom_id || !classroom_id.trim()) {
+    return {
+      statusCode: 400,
+      body: {
+        error: 'Falta el parámetro "classroom_id"',
+        required: ['classroom_id'],
+        optional: ['max_flashcards (default: 20)', 'difficulty_level (default: mixed)'],
+        hint: 'El ID del classroom es obligatorio'
+      }
+    };
+  }
+
+  // Validar difficulty_level
+  const validLevels = ['easy', 'medium', 'hard', 'mixed'];
+  if (!validLevels.includes(difficulty_level)) {
+    return {
+      statusCode: 400,
+      body: {
+        error: 'Nivel de dificultad inválido',
+        received: difficulty_level,
+        allowed: validLevels,
+        hint: 'Use uno de los niveles permitidos'
+      }
+    };
+  }
+
+  // Validar max_flashcards
+  const parsedMax = parseInt(max_flashcards);
+  if (isNaN(parsedMax) || parsedMax < 1 || parsedMax > 50) {
+    return {
+      statusCode: 400,
+      body: {
+        error: 'max_flashcards debe ser un número entre 1 y 50',
+        received: max_flashcards,
+        hint: 'Use un número razonable de flashcards a generar'
+      }
+    };
+  }
+
+  try {
+    console.log(`[MCP] Generando flashcards`);
+    console.log(`[MCP] Classroom ID: ${classroom_id}`);
+    console.log(`[MCP] Max Flashcards: ${parsedMax}`);
+    console.log(`[MCP] Difficulty Level: ${difficulty_level}`);
+    console.log(`[MCP] Este proceso puede tomar varios segundos...`);
+
+    // Llamar al tool generate_flashcards del servidor MCP
+    const result = await callMcpTool('generate_flashcards', {
+      classroom_id,
+      max_flashcards: parsedMax,
+      difficulty_level
+    });
+
+    return {
+      statusCode: 200,
+      body: {
+        success: true,
+        data: result,
+        source: 'mcp_server',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          classroom_id,
+          max_flashcards: parsedMax,
+          difficulty_level
+        }
+      }
+    };
+  } catch (error) {
+    console.error(`[MCP] Error generando flashcards:`, error);
+    
+    return {
+      statusCode: 500,
+      body: {
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        hint: 'Verifica que el classroom tenga documentos con contenido'
+      }
+    };
+  }
+}
+
+/**
  * Exportar los handlers MCP
  */
 module.exports = {
@@ -1072,4 +1147,5 @@ module.exports = {
   handleMcpProfessorAssistant,
   handleMcpGenerateResources,
   handleMcpAnalyzeUserContext,
+  handleMcpGenerateFlashcards,
 };
